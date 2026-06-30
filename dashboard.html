@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUCIA — Options Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  @font-face {
+    font-family: 'Hooge';
+    src: url('hooge 0853.ttf') format('truetype');
+    font-display: swap;
+  }
+
+  :root {
+    --bg:       #07080d;
+    --surface:  #0d0f17;
+    --surface2: #12141f;
+    --border:   #1d2230;
+    --border2:  #2b3145;
+    --text:     #dbe2f0;
+    --muted:    #5c637c;
+    --accent:   #25e6c4;   /* 청록 — 수익 */
+    --accent-a: #ff3d9a;   /* 분홍 */
+    --accent-b: #25e6c4;   /* 청록 */
+    --red:      #ff4757;
+    --yellow:   #ffb23c;
+    --blue:     #25e6c4;
+    --purple:   #ff3d9a;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-display: 'Hooge', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background:
+      radial-gradient(ellipse 900px 500px at -10% -10%, rgba(255,61,154,0.09), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 110% 10%, rgba(37,230,196,0.09), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .card::before, .card::after {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border-style: solid; border-width: 0; pointer-events: none; z-index: 2;
+  }
+  .card::before { top: -1px; left: -1px; border-top: 2px solid var(--accent-a); border-left: 2px solid var(--accent-a); }
+  .card::after  { bottom: -1px; right: -1px; border-bottom: 2px solid var(--accent-b); border-right: 2px solid var(--accent-b); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card-header .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+    display: inline-block;
+  }
+
+  /* ── 헤더 ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  }
+
+  @property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    background: conic-gradient(from var(--angle) at 50% 50%, var(--accent-b), #ffffff, var(--accent-a), #ffffff, var(--accent-b));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: spin-gradient 5s linear infinite;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  @keyframes spin-gradient { to { --angle: 360deg; } }
+
+  .logo .v { color: var(--muted); font-size: 11px; margin-left: 6px; font-family: var(--font-mono); -webkit-text-fill-color: var(--muted); letter-spacing: 0.14em; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  #timestamp {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  #market-status {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+  }
+  .status-open  { color: var(--accent); border-color: var(--accent) !important; }
+  .status-closed { color: var(--red); border-color: var(--red) !important; }
+
+  /* ── 탭 바 ── */
+  .tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 49px;
+    z-index: 99;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .tab-btn.active {
+    color: var(--bg);
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    font-weight: 700;
+  }
+  .tab-btn .tab-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--border2); flex-shrink: 0;
+  }
+  .tab-btn.active .tab-dot { background: var(--bg); }
+  .tab-btn.live .tab-dot { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  .tab-btn.active.live .tab-dot { background: var(--bg); animation: none; }
+  .tab-btn.pending .tab-dot { background: var(--yellow); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── 레이아웃 ── */
+  main {
+    padding: 20px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ── 계좌 요약 (상단 KPI) ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+  }
+
+  .kpi {
+    padding: 20px 18px;
+    border-right: 1px solid var(--border);
+  }
+  .kpi:last-child { border-right: none; }
+
+  .kpi-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    margin-top: 4px;
+    color: var(--muted);
+  }
+
+  .pos  { color: var(--accent); }
+  .neg  { color: var(--red); }
+  .neu  { color: var(--text); }
+
+  /* ── 중간 행: 오픈 포지션 + 차트 ── */
+  .mid-row {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+  }
+
+  /* ── 테이블 ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  thead th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  tbody td {
+    padding: 10px 12px;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .ticker-badge {
+    display: inline-block;
+    background: rgba(37,230,196,0.1);
+    color: var(--accent-b);
+    border: 1px solid rgba(37,230,196,0.25);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .opt-sym {
+    font-size: 10px;
+    color: var(--muted);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pnl-cell { font-weight: 700; }
+
+  .pill {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .pill-win  { background: rgba(37,230,196,0.15); color: var(--accent); }
+  .pill-loss { background: rgba(255,71,87,0.15);  color: var(--red); }
+  .pill-open { background: rgba(255,61,154,0.15); color: var(--accent-a); }
+  .pill-exit { background: rgba(255,178,60,0.12); color: var(--yellow); }
+  .pill-pending { background: rgba(255,178,60,0.12); color: var(--yellow); }
+
+  /* ── 차트 영역 ── */
+  .chart-wrap {
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chart-container {
+    position: relative;
+    flex: 1;
+    min-height: 180px;
+  }
+
+  /* ── 통계 바 ── */
+  .stat-row {
+    display: flex;
+    gap: 16px;
+    padding: 14px 16px;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  /* ── 하단 거래 내역 ── */
+  .history-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+  }
+
+  .history-scroll::-webkit-scrollbar { width: 4px; }
+  .history-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── 승률 도넛 ── */
+  .win-rate-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .win-rate-chart {
+    position: relative;
+    width: 72px; height: 72px;
+    flex-shrink: 0;
+  }
+
+  .win-rate-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+
+  .win-rate-label span {
+    font-size: 9px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .win-loss-nums {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .wl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .wl-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── 모델 미연동 플레이스홀더 ── */
+  .model-meta {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .model-status-pill {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em;
+    padding: 2px 9px; border-radius: 4px; text-transform: uppercase;
+    background: rgba(255,178,60,0.12); color: var(--yellow); border: 1px solid rgba(255,178,60,0.3);
+  }
+  .model-status-pill.live { background: rgba(37,230,196,0.12); color: var(--accent); border-color: rgba(37,230,196,0.3); }
+
+  .placeholder-note {
+    padding: 14px 16px; border-top: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .placeholder-note .blink-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); flex-shrink: 0;
+    animation: blip 1.6s ease-in-out infinite;
+  }
+  @keyframes blip { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ── 반응형 ── */
+  @media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .kpi { border-bottom: 1px solid var(--border); }
+    .mid-row { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 768px) {
+    main { padding: 12px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-value { font-size: 18px; }
+  }
+
+  /* ── 빈 상태 ── */
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    LUCIA
+    <span class="v">QUANT OPTIONS TERMINAL // ALPACA</span>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <span id="timestamp">--:--:--</span>
+    <span id="market-status">CONNECTING...</span>
+    <a href="/logout" id="logout-btn" style="
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      transition: all 0.2s;
+      letter-spacing: 0.08em;
+    " onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'"
+       onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border2)'">
+      LOGOUT
+    </a>
+  </div>
+</header>
+
+<div class="tab-bar" id="tab-bar">
+  <button class="tab-btn active live" data-tab="main" onclick="switchTab('main')">
+    <span class="tab-dot"></span> MAIN · PUT 매수 전략
+  </button>
+  <button class="tab-btn pending" data-tab="b" onclick="switchTab('b')">
+    <span class="tab-dot"></span> MODEL B
+  </button>
+  <button class="tab-btn pending" data-tab="c" onclick="switchTab('c')">
+    <span class="tab-dot"></span> MODEL C
+  </button>
+</div>
+
+<main>
+
+  <!-- ══════════════ TAB: MAIN ══════════════ -->
+  <div class="tab-panel active" id="panel-main">
+
+    <!-- ① KPI 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <span><span class="dot"></span>계좌 현황</span>
+        <span id="last-update" style="color: var(--muted); font-size:10px;">업데이트 중...</span>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">포트폴리오 가치</div>
+          <div class="kpi-value" id="kpi-portfolio">--</div>
+          <div class="kpi-sub" id="kpi-portfolio-sub">초기 $300,000</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">순손익 ($)</div>
+          <div class="kpi-value" id="kpi-net-pnl">--</div>
+          <div class="kpi-sub" id="kpi-net-pct">ROI: --%</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">실현 손익</div>
+          <div class="kpi-value" id="kpi-realized">--</div>
+          <div class="kpi-sub">확정 거래 기준</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">미실현 손익</div>
+          <div class="kpi-value" id="kpi-unrealized">--</div>
+          <div class="kpi-sub">현재 보유 기준</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">가용 현금</div>
+          <div class="kpi-value" id="kpi-cash">--</div>
+          <div class="kpi-sub" id="kpi-bp">매수여력: --</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">오픈 포지션</div>
+          <div class="kpi-value" id="kpi-open-count" style="color:var(--accent-a)">--</div>
+          <div class="kpi-sub" id="kpi-total-trades">총 거래: --</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 오픈 포지션 + 차트 -->
+    <div class="mid-row">
+
+      <!-- 오픈 포지션 테이블 -->
+      <div class="card">
+        <div class="card-header">
+          <span><span class="dot" style="background:var(--accent-a)"></span>오픈 포지션 (PUT 매수)</span>
+          <span id="open-count-badge" style="color:var(--accent-a)">0개</span>
+        </div>
+        <div id="open-positions-wrap">
+          <div class="empty-state">포지션 없음 — 스캐너 실행 중...</div>
+        </div>
+      </div>
+
+      <!-- 통계 + 승률 도넛 -->
+      <div class="card">
+        <div class="card-header">
+          <span><span class="dot" style="background:var(--accent-a)"></span>성과 요약</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <div class="stat-label">승률</div>
+            <div class="stat-val pos" id="stat-winrate">--%</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">총 거래</div>
+            <div class="stat-val" id="stat-total">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Win</div>
+            <div class="stat-val pos" id="stat-wins">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Loss</div>
+            <div class="stat-val neg" id="stat-losses">--</div>
+          </div>
+        </div>
+        <div class="win-rate-wrap">
+          <div class="win-rate-chart">
+            <canvas id="donut-chart"></canvas>
+            <div class="win-rate-label" id="donut-label">--%<span>승률</span></div>
+          </div>
+          <div class="win-loss-nums">
+            <div class="wl-row">
+              <div class="wl-dot" style="background:var(--accent)"></div>
+              <span style="color:var(--muted)">WIN</span>
+              <span id="wl-wins" class="pos" style="margin-left:4px">--</span>
+            </div>
+            <div class="wl-row">
+              <div class="wl-dot" style="background:var(--red)"></div>
+              <span style="color:var(--muted)">LOSS</span>
+              <span id="wl-losses" class="neg" style="margin-left:4px">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 일별 P&L 차트 -->
+        <div class="card-header" style="border-top:1px solid var(--border); margin-top:4px">
+          <span>일별 P&L ($)</span>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-container">
+            <canvas id="pnl-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ③ 거래 내역 -->
+    <div class="card">
+      <div class="card-header">
+        <span><span class="dot" style="background:var(--yellow)"></span>거래 내역 (최근 30건)</span>
+      </div>
+      <div class="history-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>시간</th>
+              <th>종목</th>
+              <th>옵션 심볼</th>
+              <th>스트라이크</th>
+              <th>만기</th>
+              <th>계약수</th>
+              <th>진입가</th>
+              <th>청산가</th>
+              <th>손익%</th>
+              <th>손익($)</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr><td colspan="11" class="empty-state">데이터 로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════ TAB: MODEL B (대기) ══════════════ -->
+  <div class="tab-panel" id="panel-b">
+    <div class="card">
+      <div class="card-header">
+        <span class="model-meta"><span class="dot" style="background:var(--yellow)"></span>MODEL B — 전략 미정</span>
+        <span class="model-status-pill" id="status-pill-b">미연동</span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-item"><div class="stat-label">순손익</div><div class="stat-val" id="kpi-net-pnl-b">--</div></div>
+        <div class="stat-item"><div class="stat-label">ROI</div><div class="stat-val" id="kpi-roi-b">--%</div></div>
+        <div class="stat-item"><div class="stat-label">승률</div><div class="stat-val pos" id="stat-winrate-b">--%</div></div>
+        <div class="stat-item"><div class="stat-label">총 거래</div><div class="stat-val" id="stat-total-b">--</div></div>
+      </div>
+      <div class="card-header" style="border-top:1px solid var(--border)"><span>일별 P&L ($)</span></div>
+      <div class="chart-wrap">
+        <div class="chart-container"><canvas id="pnl-chart-b"></canvas></div>
+      </div>
+      <div class="placeholder-note">
+        <span class="blink-dot"></span>
+        이 전략은 아직 연동되지 않았습니다 — <code>/api/data?model=b</code> 응답이 감지되면 자동으로 그래프가 채워집니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB: MODEL C (대기) ══════════════ -->
+  <div class="tab-panel" id="panel-c">
+    <div class="card">
+      <div class="card-header">
+        <span class="model-meta"><span class="dot" style="background:var(--yellow)"></span>MODEL C — 전략 미정</span>
+        <span class="model-status-pill" id="status-pill-c">미연동</span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-item"><div class="stat-label">순손익</div><div class="stat-val" id="kpi-net-pnl-c">--</div></div>
+        <div class="stat-item"><div class="stat-label">ROI</div><div class="stat-val" id="kpi-roi-c">--%</div></div>
+        <div class="stat-item"><div class="stat-label">승률</div><div class="stat-val pos" id="stat-winrate-c">--%</div></div>
+        <div class="stat-item"><div class="stat-label">총 거래</div><div class="stat-val" id="stat-total-c">--</div></div>
+      </div>
+      <div class="card-header" style="border-top:1px solid var(--border)"><span>일별 P&L ($)</span></div>
+      <div class="chart-wrap">
+        <div class="chart-container"><canvas id="pnl-chart-c"></canvas></div>
+      </div>
+      <div class="placeholder-note">
+        <span class="blink-dot"></span>
+        이 전략은 아직 연동되지 않았습니다 — <code>/api/data?model=c</code> 응답이 감지되면 자동으로 그래프가 채워집니다.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── 차트 인스턴스 ──
+let donutChart = null;
+let pnlChart   = null;
+const modelCharts = {}; // { b: ChartInstance, c: ChartInstance }
+
+const $ = id => document.getElementById(id);
+
+// ── 숫자 포맷 ──
+const fmt  = (v, d=2) => v == null ? '--' : Number(v).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+const fmtK = v => {
+  if (v == null) return '--';
+  const n = Number(v);
+  if (Math.abs(n) >= 1000) return (n/1000).toFixed(1) + 'K';
+  return n.toFixed(2);
+};
+const colorClass = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
+const sign       = v => v > 0 ? '+' : '';
+
+// ── 탭 전환 ──
+function switchTab(key) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
+  if (key !== 'main' && !modelCharts[key]) initModelChart(key);
+  if (key !== 'main') tryLoadModel(key);
+}
+
+// ── 도넛 차트 초기화 (MAIN) ──
+function initDonut() {
+  const ctx = $('donut-chart').getContext('2d');
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [0, 1], backgroundColor: ['#25e6c4','#ff4757'], borderWidth: 0, hoverOffset: 4 }] },
+    options: {
+      cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { duration: 600 },
+    }
+  });
+}
+
+// ── 일별 P&L 차트 초기화 (MAIN) ──
+function initPnlChart() {
+  const ctx = $('pnl-chart').getContext('2d');
+  pnlChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [],
+      backgroundColor: ctx => ctx.raw >= 0 ? 'rgba(37,230,196,0.7)' : 'rgba(255,71,87,0.7)',
+      borderRadius: 3,
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ' $' + fmt(ctx.raw) }
+      }},
+      scales: {
+        x: { ticks: { color: '#5c637c', font: { family: 'monospace', size: 9 }, maxRotation: 45 }, grid: { color: '#1d2230' } },
+        y: { ticks: { color: '#5c637c', font: { family: 'monospace', size: 9 }, callback: v => '$' + fmtK(v) }, grid: { color: '#1d2230' } },
+      }
+    }
+  });
+}
+
+// ── 추가 모델 탭용 P&L 차트 초기화 (빈 상태로 시작, 데이터 들어오면 채워짐) ──
+function initModelChart(key) {
+  const canvas = $('pnl-chart-' + key);
+  if (!canvas) return;
+  modelCharts[key] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [],
+      backgroundColor: ctx => ctx.raw >= 0 ? 'rgba(37,230,196,0.7)' : 'rgba(255,71,87,0.7)',
+      borderRadius: 3,
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + fmt(ctx.raw) } } },
+      scales: {
+        x: { ticks: { color: '#5c637c', font: { family: 'monospace', size: 9 }, maxRotation: 45 }, grid: { color: '#1d2230' } },
+        y: { ticks: { color: '#5c637c', font: { family: 'monospace', size: 9 }, callback: v => '$' + fmtK(v) }, grid: { color: '#1d2230' } },
+      }
+    }
+  });
+}
+
+// ── 추가 모델 탭 데이터 시도 (없으면 미연동 상태 유지) ──
+async function tryLoadModel(key) {
+  try {
+    const res = await fetch(`/api/data?model=${key}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.account) return;
+
+    const acc = data.account, stats = data.stats || {};
+    const cls = colorClass(acc.net_pnl_dollar);
+    $('kpi-net-pnl-' + key).textContent = sign(acc.net_pnl_dollar) + '$' + fmt(Math.abs(acc.net_pnl_dollar), 0);
+    $('kpi-net-pnl-' + key).className   = 'stat-val ' + cls;
+    $('kpi-roi-' + key).textContent     = sign(acc.net_pnl_pct) + fmt(acc.net_pnl_pct) + '%';
+    $('kpi-roi-' + key).className       = 'stat-val ' + cls;
+    $('stat-winrate-' + key).textContent = (stats.win_rate ?? 0).toFixed(1) + '%';
+    $('stat-total-' + key).textContent   = stats.total_trades ?? '--';
+
+    if (modelCharts[key] && Array.isArray(data.daily_pnl) && data.daily_pnl.length) {
+      const last = data.daily_pnl.slice(-20);
+      modelCharts[key].data.labels = last.map(d => d.date.slice(5));
+      modelCharts[key].data.datasets[0].data = last.map(d => d.pnl);
+      modelCharts[key].update();
+    }
+
+    const pill = $('status-pill-' + key);
+    pill.textContent = '연동됨';
+    pill.classList.add('live');
+  } catch (e) {
+    // 백엔드에 아직 해당 모델 엔드포인트가 없으면 조용히 무시 — 미연동 상태 유지
+  }
+}
+
+// ── 도넛 업데이트 ──
+function updateDonut(wins, losses, winRate) {
+  if (!donutChart) return;
+  const total = wins + losses;
+  donutChart.data.datasets[0].data = total > 0 ? [wins, losses] : [0, 1];
+  donutChart.update();
+  $('donut-label').innerHTML = `${winRate.toFixed(1)}%<span>승률</span>`;
+}
+
+// ── 일별 P&L 업데이트 ──
+function updatePnlChart(daily) {
+  if (!pnlChart || !daily.length) return;
+  const last = daily.slice(-20); // 최근 20일
+  pnlChart.data.labels   = last.map(d => d.date.slice(5)); // MM-DD
+  pnlChart.data.datasets[0].data = last.map(d => d.pnl);
+  pnlChart.update();
+}
+
+// ── 오픈 포지션 렌더 ──
+function renderOpenPositions(positions) {
+  const wrap = $('open-positions-wrap');
+  $('open-count-badge').textContent = positions.length + '개';
+  $('kpi-open-count').textContent   = positions.length;
+
+  if (!positions.length) {
+    wrap.innerHTML = '<div class="empty-state">현재 보유 포지션 없음 — 스캐너 실행 중...</div>';
+    return;
+  }
+
+  const rows = positions.map(p => {
+    const cls  = colorClass(p.pnl_pct);
+    const pill = p.pnl_pct > 0 ? 'pill-win' : 'pill-loss';
+    return `
+      <tr>
+        <td><span class="ticker-badge">${p.ticker}</span></td>
+        <td><span class="opt-sym">${p.opt_symbol || '-'}</span></td>
+        <td>$${fmt(p.strike)}</td>
+        <td>${p.expiry}</td>
+        <td style="color:var(--accent-a)">${p.contracts}계약</td>
+        <td>$${fmt(p.entry_stock)}</td>
+        <td>$${fmt(p.entry_opt, 2)}</td>
+        <td>${p.curr_opt > 0 ? '$' + fmt(p.curr_opt, 2) : '-'}</td>
+        <td class="pnl-cell ${cls}">${sign(p.pnl_pct)}${fmt(p.pnl_pct)}%</td>
+        <td class="pnl-cell ${cls}">${sign(p.pnl_dollar)}$${fmt(Math.abs(p.pnl_dollar))}</td>
+        <td>${p.days_held}일</td>
+        <td style="color:var(--muted);font-size:10px">${(p.prob*100).toFixed(0)}%</td>
+      </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>종목</th><th>옵션 심볼</th><th>스트라이크</th><th>만기</th>
+          <th>계약수</th><th>주가(진입)</th><th>옵션(진입)</th><th>옵션(현재)</th>
+          <th>손익%</th><th>손익($)</th><th>보유</th><th>확률</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── 거래 내역 렌더 ──
+function renderHistory(trades) {
+  const tbody = $('history-tbody');
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">거래 내역 없음</td></tr>';
+    return;
+  }
+
+  const statusPill = s => {
+    if (s.includes('StopLoss')) return `<span class="pill pill-loss">StopLoss</span>`;
+    if (s.includes('Bankrupt')) return `<span class="pill pill-loss">Bankrupt</span>`;
+    if (s.includes('TimeExit')) return `<span class="pill pill-exit">TimeExit</span>`;
+    if (s.includes('TrailingStop')) return `<span class="pill pill-win">Trailing</span>`;
+    if (s.includes('ExpiryExit')) return `<span class="pill pill-exit">Expiry</span>`;
+    return `<span class="pill pill-open">${s}</span>`;
+  };
+
+  tbody.innerHTML = trades.map(t => {
+    const cls = colorClass(t.return_pct);
+    return `
+      <tr>
+        <td style="color:var(--muted);font-size:10px">${t.time.slice(5,16)}</td>
+        <td><span class="ticker-badge">${t.ticker}</span></td>
+        <td><span class="opt-sym" title="${t.opt_symbol}">${t.opt_symbol.slice(-14) || '-'}</span></td>
+        <td>$${fmt(t.strike)}</td>
+        <td style="color:var(--muted)">${t.expiry}</td>
+        <td style="color:var(--accent-a)">${t.contracts}</td>
+        <td>$${fmt(t.entry_opt, 2)}</td>
+        <td>$${fmt(t.exit_opt, 2)}</td>
+        <td class="pnl-cell ${cls}">${sign(t.return_pct)}${fmt(t.return_pct)}%</td>
+        <td class="pnl-cell ${cls}">${sign(t.pnl_dollar)}$${Math.abs(t.pnl_dollar).toFixed(0)}</td>
+        <td>${statusPill(t.status)}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ── KPI 업데이트 (MAIN) ──
+function updateKPIs(d) {
+  const acc   = d.account;
+  const stats = d.stats;
+
+  // 포트폴리오
+  const portCls = colorClass(acc.net_pnl_dollar);
+  $('kpi-portfolio').textContent     = '$' + fmt(acc.portfolio_value, 0);
+  $('kpi-portfolio').className       = 'kpi-value ' + portCls;
+
+  // 순손익
+  $('kpi-net-pnl').textContent       = sign(acc.net_pnl_dollar) + '$' + fmt(Math.abs(acc.net_pnl_dollar), 0);
+  $('kpi-net-pnl').className         = 'kpi-value ' + portCls;
+  $('kpi-net-pct').textContent       = 'ROI: ' + sign(acc.net_pnl_pct) + fmt(acc.net_pnl_pct) + '%';
+  $('kpi-net-pct').className         = 'kpi-sub ' + portCls;
+
+  // 실현
+  const realCls = colorClass(acc.realized_dollar);
+  $('kpi-realized').textContent      = sign(acc.realized_dollar) + '$' + fmt(Math.abs(acc.realized_dollar), 0);
+  $('kpi-realized').className        = 'kpi-value ' + realCls;
+
+  // 미실현
+  const unrCls = colorClass(acc.unrealized_dollar);
+  $('kpi-unrealized').textContent    = sign(acc.unrealized_dollar) + '$' + fmt(Math.abs(acc.unrealized_dollar), 0);
+  $('kpi-unrealized').className      = 'kpi-value ' + unrCls;
+
+  // 현금
+  $('kpi-cash').textContent          = '$' + fmt(acc.cash, 0);
+  $('kpi-bp').textContent            = '매수여력: $' + fmt(acc.buying_power, 0);
+
+  // 총 거래
+  $('kpi-total-trades').textContent  = '총 거래: ' + stats.total_trades + '건';
+
+  // 통계
+  $('stat-winrate').textContent = stats.win_rate.toFixed(1) + '%';
+  $('stat-total').textContent   = stats.total_trades;
+  $('stat-wins').textContent    = stats.wins;
+  $('stat-losses').textContent  = stats.losses;
+  $('wl-wins').textContent      = stats.wins;
+  $('wl-losses').textContent    = stats.losses;
+}
+
+// ── 마켓 상태 ──
+function updateMarketStatus() {
+  const el  = $('market-status');
+  const now = new Date();
+  const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const h   = est.getHours(), m = est.getMinutes(), day = est.getDay();
+  const isOpen = day >= 1 && day <= 5 && (h > 9 || (h === 9 && m >= 30)) && h < 16;
+
+  el.textContent = isOpen ? '● MARKET OPEN' : '○ MARKET CLOSED';
+  el.className   = isOpen ? 'status-open' : 'status-closed';
+}
+
+// ── 메인 업데이트 루프 ──
+async function fetchAndUpdate() {
+  try {
+    const res  = await fetch('/api/data');
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const data = await res.json();
+
+    $('timestamp').textContent  = data.timestamp;
+    $('last-update').textContent = '최종 업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+
+    updateKPIs(data);
+    updateDonut(data.stats.wins, data.stats.losses, data.stats.win_rate);
+    updatePnlChart(data.daily_pnl);
+    renderOpenPositions(data.open_positions);
+    renderHistory(data.trade_history);
+    updateMarketStatus();
+
+  } catch (e) {
+    console.error('데이터 로드 오류:', e);
+    $('last-update').textContent = '⚠️ 서버 연결 오류 — 재연결 중...';
+  }
+}
+
+// ── 초기화 ──
+initDonut();
+initPnlChart();
+fetchAndUpdate();
+setInterval(fetchAndUpdate, 10000);   // 10초마다 갱신
+setInterval(updateMarketStatus, 60000);
+</script>
+
+</body>
+</html>

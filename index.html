@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUCIA — Terminal Access</title>
+<style>
+  @font-face {
+    font-family: 'Hooge';
+    src: url('hooge 0853.ttf') format('truetype');
+    font-display: swap;
+  }
+
+  :root {
+    --bg:        #07080d;
+    --surface:   #0d0f17;
+    --surface2:  #12141f;
+    --border:    #1d2230;
+    --border2:   #2b3145;
+    --text:      #dbe2f0;
+    --muted:     #5c637c;
+    --accent-a:  #ff3d9a;   /* 분홍 */
+    --accent-b:  #25e6c4;   /* 청록 */
+    --profit:    #25e6c4;
+    --loss:      #ff4757;
+    --mono:      'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    --sans:      'Inter', system-ui, sans-serif;
+    --display:   'Hooge', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .field { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(37,230,196,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(37,230,196,0.035) 1px, transparent 1px);
+    background-size: 34px 34px;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, #000 30%, transparent 90%);
+  }
+
+  .glow-a, .glow-b {
+    position: fixed; width: 620px; height: 620px; border-radius: 50%;
+    filter: blur(120px); z-index: 0; opacity: 0.30;
+  }
+  .glow-a { background: var(--accent-a); top: -220px; left: -200px; }
+  .glow-b { background: var(--accent-b); bottom: -260px; right: -220px; opacity: 0.24; }
+
+  .scanline {
+    position: fixed; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(37,230,196,0.55), transparent);
+    z-index: 2; pointer-events: none;
+    animation: scan 5.5s linear infinite;
+  }
+  @keyframes scan { 0% { top: -2%; } 100% { top: 102%; } }
+
+  .corner-tag {
+    position: fixed; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    color: var(--muted); z-index: 1;
+  }
+  .corner-tag.tl { top: 24px; left: 28px; }
+  .corner-tag.tr { top: 24px; right: 28px; text-align: right; }
+  .corner-tag.bl { bottom: 24px; left: 28px; }
+  .corner-tag.br { bottom: 24px; right: 28px; text-align: right; }
+  .corner-tag b { color: var(--accent-b); font-weight: 600; }
+  .corner-tag .pulse-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 1px;
+    background: var(--accent-b); margin-right: 6px;
+    animation: blip 1.6s ease-in-out infinite;
+  }
+  @keyframes blip { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  .panel-wrap { position: relative; z-index: 3; width: 430px; }
+
+  .bracket {
+    position: absolute; width: 22px; height: 22px;
+    border-color: var(--accent-a); border-style: solid; border-width: 0;
+  }
+  .bracket.tl { top: -10px; left: -10px; border-top-width: 2px; border-left-width: 2px; }
+  .bracket.tr { top: -10px; right: -10px; border-top-width: 2px; border-right-width: 2px; border-color: var(--accent-b); }
+  .bracket.bl { bottom: -10px; left: -10px; border-bottom-width: 2px; border-left-width: 2px; border-color: var(--accent-b); }
+  .bracket.br { bottom: -10px; right: -10px; border-bottom-width: 2px; border-right-width: 2px; }
+
+  .login-container {
+    position: relative;
+    background: linear-gradient(160deg, var(--surface) 0%, var(--surface2) 100%);
+    border: 1px solid var(--border);
+    padding: 44px 38px 38px;
+    border-radius: 4px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(37,230,196,0.03);
+    text-align: center;
+  }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 18px; display: flex; align-items: center;
+    justify-content: center; gap: 10px;
+  }
+  .eyebrow::before, .eyebrow::after { content: ''; height: 1px; flex: 1; background: var(--border2); }
+
+  @property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .animated-logo {
+    font-size: 3rem;
+    font-family: var(--display);
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    background: conic-gradient(from var(--angle) at 50% 50%, var(--accent-b), #ffffff, var(--accent-a), #ffffff, var(--accent-b));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: spin-gradient 5s linear infinite;
+    line-height: 1.1;
+  }
+  @keyframes spin-gradient { to { --angle: 360deg; } }
+
+  .tagline {
+    font-size: 10.5px; letter-spacing: 0.22em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 32px;
+  }
+  .tagline span { color: var(--accent-b); }
+
+  .input-group { margin-bottom: 18px; text-align: left; position: relative; }
+
+  .input-group label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 7px; color: var(--muted); font-size: 0.72rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  .input-group input {
+    width: 100%; padding: 13px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .input-group input::placeholder { color: #3a4156; }
+  .input-group input:focus {
+    border-color: var(--accent-b);
+    box-shadow: 0 0 0 3px rgba(37,230,196,0.10);
+  }
+
+  .login-btn {
+    width: 100%; padding: 15px;
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    background-size: 220% 100%;
+    background-position: 0% 0%;
+    color: #07080d;
+    border: none; border-radius: 4px;
+    font-family: var(--mono);
+    font-weight: 700; font-size: 0.9rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; margin-top: 8px;
+    transition: background-position 0.4s ease, transform 0.15s ease;
+  }
+  .login-btn:hover { background-position: 100% 0%; transform: translateY(-1px); }
+  .login-btn:disabled { background: var(--border2); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  .link-text {
+    margin-top: 22px; font-size: 0.78rem; color: var(--muted);
+    display: block; text-decoration: none; letter-spacing: 0.02em;
+    transition: color 0.2s;
+  }
+  .link-text b { color: var(--text); font-weight: 600; }
+  .link-text:hover { color: var(--accent-b); }
+
+  .msg-box {
+    margin-top: 20px; padding: 12px 14px; border-radius: 4px;
+    font-size: 0.8rem; display: none; text-align: left; letter-spacing: 0.01em;
+  }
+
+  .footline {
+    margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border);
+    font-size: 9.5px; letter-spacing: 0.16em; color: #353c50;
+    text-transform: uppercase; display: flex; justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<div class="field">
+  <div class="grid-bg"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+  <div class="scanline"></div>
+</div>
+
+<span class="corner-tag tl"><span class="pulse-dot"></span><b>LUCIA</b> // OPTIONS ENGINE</span>
+<span class="corner-tag tr">ALPACA<br>LINK LAYER</span>
+<span class="corner-tag bl">NODE 0x4F2C</span>
+<span class="corner-tag br" id="corner-time">--:--:--</span>
+
+<div class="panel-wrap">
+  <div class="bracket tl"></div>
+  <div class="bracket tr"></div>
+  <div class="bracket bl"></div>
+  <div class="bracket br"></div>
+
+  <div class="login-container">
+    <div class="eyebrow">SYS // AUTH</div>
+    <div class="animated-logo">LUCIA</div>
+    <div class="tagline">Quant Options <span>Terminal</span></div>
+
+    <div class="input-group">
+      <label>System ID</label>
+      <input type="text" id="userid" placeholder="아이디 입력" autocomplete="off">
+    </div>
+
+    <div class="input-group">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="비밀번호 입력" autocomplete="off">
+    </div>
+
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Connect to Server</button>
+    <a href="signup.html" class="link-text">LUCIA 계정이 없으신가요? <b>회원가입</b></a>
+
+    <div id="msg-box" class="msg-box"></div>
+
+    <div class="footline">
+      <span>v2.1 // Build LUCIA-OPT</span>
+      <span>Encrypted Session</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function tickClock() {
+  const el = document.getElementById('corner-time');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+async function doLogin() {
+  const userid    = document.getElementById('userid').value.trim();
+  const password  = document.getElementById('password').value.trim();
+  const btn       = document.getElementById('login-btn');
+  const box       = document.getElementById('msg-box');
+
+  if (!userid || !password) {
+    box.style.display = 'block';
+    box.style.background = 'rgba(255, 71, 87, 0.1)';
+    box.style.color = 'var(--loss)';
+    box.style.border = '1px solid var(--loss)';
+    box.innerHTML = '⚠ 아이디와 비밀번호를 모두 입력해주세요.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = 'AUTHENTICATING...';
+  box.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userid, password })
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      box.style.display = 'block';
+      box.style.background = 'rgba(37, 230, 196, 0.1)';
+      box.style.color = 'var(--profit)';
+      box.style.border = '1px solid var(--profit)';
+      box.innerHTML = '✓ 로그인 성공! 봇을 구동합니다...';
+      btn.innerHTML = 'CONNECTED';
+
+      setTimeout(() => { window.location.href = '/'; }, 1500);
+    } else {
+      throw new Error(data.error || '로그인 실패');
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = 'Connect to Server';
+    box.style.display = 'block';
+    box.style.background = 'rgba(255, 71, 87, 0.1)';
+    box.style.color = 'var(--loss)';
+    box.style.border = '1px solid var(--loss)';
+    box.innerHTML = `✕ 오류: ${err.message}`;
+  }
+}
+</script>
+</body>
+</html>
